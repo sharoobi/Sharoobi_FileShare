@@ -1,0 +1,149 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: deployhub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - deployhub_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - deployhub_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: deployhub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - deployhub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - deployhub_net
+
+  api:
+    build:
+      context: ./backend/api
+    container_name: deployhub-api
+    restart: unless-stopped
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      PROJECT_SLUG: ${PROJECT_SLUG}
+      TZ: ${TZ}
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_API_TOKEN: ${BOOTSTRAP_API_TOKEN}
+      PRIMARY_SHARE_PATH: ${PRIMARY_SHARE_PATH}
+      OFFICE_SHARE_PATH: ${OFFICE_SHARE_PATH}
+      DRIVER_SHARE_PATH: ${DRIVER_SHARE_PATH}
+      HOST_NODE_NAME: ${HOST_NODE_NAME}
+      STORAGE_ROOT: /srv/deployhub
+      ADMIN_STATIC_ROOT: /srv/admin
+    volumes:
+      - ./storage:/srv/deployhub
+      - ./frontend/admin-web:/srv/admin:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - deployhub_net
+
+  worker:
+    build:
+      context: ./backend/worker
+    container_name: deployhub-worker
+    restart: unless-stopped
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      TZ: ${TZ}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      PRIMARY_SHARE_PATH: ${PRIMARY_SHARE_PATH}
+      OFFICE_SHARE_PATH: ${OFFICE_SHARE_PATH}
+      DRIVER_SHARE_PATH: ${DRIVER_SHARE_PATH}
+      HOST_NODE_NAME: ${HOST_NODE_NAME}
+      STORAGE_ROOT: /srv/deployhub
+    volumes:
+      - ./storage:/srv/deployhub
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - deployhub_net
+
+  sftpgo:
+    image: drakkan/sftpgo:latest
+    container_name: deployhub-sftpgo
+    restart: unless-stopped
+    environment:
+      SFTPGO_DEFAULT_ADMIN_USERNAME: ${SFTPGO_DEFAULT_ADMIN_USERNAME}
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${SFTPGO_DEFAULT_ADMIN_PASSWORD}
+      SFTPGO_DATA_PROVIDER__DRIVER: sqlite
+      SFTPGO_DATA_PROVIDER__NAME: /var/lib/sftpgo/sftpgo.db
+      SFTPGO_HTTPD__BINDINGS__0__PORT: 8080
+      SFTPGO_SFTPD__BINDINGS__0__PORT: 2022
+      SFTPGO_WEBDAVD__BINDINGS__0__PORT: 10080
+      SFTPGO_COMMON__DEFENDER__ENABLED: true
+      SFTPGO_COMMON__DEFENDER__BAN_TIME: 15
+      SFTPGO_COMMON__DEFENDER__THRESHOLD: 5
+      TZ: ${TZ}
+    ports:
+      - "${SFTPGO_HTTP_PORT}:8080"
+      - "${SFTPGO_SFTP_PORT}:2022"
+    volumes:
+      - ./storage:/srv/sftpgo
+      - ./infra/sftpgo:/var/lib/sftpgo
+    networks:
+      - deployhub_net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: deployhub-caddy
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_HTTP_PORT}:80"
+      - "${PUBLIC_HTTPS_PORT}:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/admin-web:/srv/admin:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - deployhub_net
+
+networks:
+  deployhub_net:
+    name: deployhub_net
+    driver: bridge
+
+volumes:
+  deployhub_db_data:
+  deployhub_redis_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sharoobi FileShare Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="eyebrow">Windows LAN Control Plane</span>
+          <h1>Sharoobi FileShare</h1>
+          <p>Share existing local paths, gate installs, and control technician access from one host.</p>
+        </div>
+        <nav class="nav-list">
+          <a href="#overview">Overview</a>
+          <a href="#shares">Shares</a>
+          <a href="#devices">Devices</a>
+          <a href="#jobs">Jobs</a>
+          <a href="#policies">Policies</a>
+          <a href="#packages">Packages</a>
+          <a href="#bridge">Host Bridge</a>
+        </nav>
+        <div class="sidebar-note" id="session-summary">
+          Login with the bootstrap admin from `.env` to manage paths already present on this machine.
+        </div>
+        <button class="ghost-button" id="logout-button" type="button">Clear Session</button>
+      </aside>
+
+      <main class="content">
+        <section class="hero" id="overview">
+          <div class="hero-copy">
+            <p class="eyebrow">Local Path Orchestration</p>
+            <h2>Turn any existing Windows path into a controlled share without rebuilding your storage layout.</h2>
+            <div class="hero-strip">
+              <span class="hero-chip">JWT Auth</span>
+              <span class="hero-chip">RBAC</span>
+              <span class="hero-chip">Shared Paths</span>
+              <span class="hero-chip">Install Jobs</span>
+              <span class="hero-chip">Host Bridge</span>
+            </div>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-card">
+              <span>Status</span>
+              <strong id="status-value">Loading</strong>
+            </div>
+            <div class="stat-card">
+              <span>Shares</span>
+              <strong id="shares-count">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Devices</span>
+              <strong id="devices-count">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Active User</span>
+              <strong id="current-user">Guest</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel auth-panel" id="login">
+          <div class="panel-header">
+            <h3>Admin Session</h3>
+            <span id="auth-mode">JWT local admin</span>
+          </div>
+          <div class="auth-grid">
+            <form id="login-form" class="login-form">
+              <label>
+                <span>Username</span>
+                <input id="username" name="username" type="text" placeholder="admin" autocomplete="username" required />
+              </label>
+              <label>
+                <span>Password</span>
+                <input id="password" name="password" type="password" placeholder="Password from .env" autocomplete="current-password" required />
+              </label>
+              <button type="submit">Open Control Plane</button>
+            </form>
+            <div class="auth-note">
+              <h4>How this build works</h4>
+              <p>The API stores metadata, policies, users, devices, packages, and jobs. The actual Windows paths remain where they already are, such as <code>H:\</code> or any exact folder you choose.</p>
+              <p>Direct local path work and SMB publishing are handled by the Windows Host Bridge layer, not by moving your files into Docker.</p>
+              <div id="login-message" class="status-banner">Waiting for credentials.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-grid">
+          <section class="panel" id="shares">
+            <div class="panel-header">
+              <h3>Shares</h3>
+              <span>Existing paths currently controlled by the platform</span>
+            </div>
+            <div id="shares-list" class="list-grid"></div>
+          </section>
+
+          <section class="panel" id="devices">
+            <div class="panel-header">
+              <h3>Devices</h3>
+              <span>Observed clients and future managed agents</span>
+            </div>
+            <div id="devices-list" class="list-grid"></div>
+          </section>
+
+          <section class="panel" id="jobs">
+            <div class="panel-header">
+              <h3>Jobs</h3>
+              <span>Install, copy, and controlled execution queue</span>
+            </div>
+            <div id="jobs-list" class="list-grid"></div>
+          </section>
+
+          <section class="panel" id="policies">
+            <div class="panel-header">
+              <h3>Policies</h3>
+              <span>Speed, browse, SMB, guest, and install rules</span>
+            </div>
+            <div id="policies-list" class="list-grid"></div>
+          </section>
+
+          <section class="panel" id="packages">
+            <div class="panel-header">
+              <h3>Packages</h3>
+              <span>Known install targets inside the shared paths</span>
+            </div>
+            <div id="packages-list" class="list-grid"></div>
+          </section>
+
+          <section class="panel" id="share-builder">
+            <div class="panel-header">
+              <h3>Add Share</h3>
+              <span>Register a real path on this host</span>
+            </div>
+            <form id="share-form" class="share-form">
+              <label>
+                <span>Slug</span>
+                <input name="slug" type="text" placeholder="main-storage" required />
+              </label>
+              <label>
+                <span>Name</span>
+                <input name="name" type="text" placeholder="Main Shared Storage" required />
+              </label>
+              <label class="wide">
+                <span>Windows Path</span>
+                <input name="source_path" type="text" placeholder="H:\SomeFolder" required />
+              </label>
+              <label>
+                <span>SMB Name</span>
+                <input name="smb_share_name" type="text" placeholder="Sharoobi_Main" />
+              </label>
+              <label>
+                <span>Access Mode</span>
+                <select name="access_mode">
+                  <option value="browse-download">browse-download</option>
+                  <option value="install-only">install-only</option>
+                  <option value="browse-only">browse-only</option>
+                </select>
+              </label>
+              <label>
+                <span>Publish Strategy</span>
+                <select name="publish_strategy">
+                  <option value="hybrid">hybrid</option>
+                  <option value="lan-smb">lan-smb</option>
+                  <option value="agent-gated">agent-gated</option>
+                  <option value="web-only">web-only</option>
+                </select>
+              </label>
+              <label class="checkbox">
+                <input name="expose_via_smb" type="checkbox" checked />
+                <span>Expose via SMB</span>
+              </label>
+              <label class="checkbox">
+                <input name="expose_via_web" type="checkbox" checked />
+                <span>Expose via Web</span>
+              </label>
+              <label class="checkbox wide">
+                <input name="allow_guest" type="checkbox" />
+                <span>Allow guest access</span>
+              </label>
+              <label class="wide">
+                <span>Notes</span>
+                <textarea name="notes" rows="3" placeholder="Optional operational note"></textarea>
+              </label>
+              <button type="submit">Register Share</button>
+              <div id="share-message" class="status-banner">No pending changes.</div>
+            </form>
+          </section>
+
+          <section class="panel bridge-panel" id="bridge">
+            <div class="panel-header">
+              <h3>Windows Host Bridge</h3>
+              <span>Native path validation, SMB publishing, and local inventory</span>
+            </div>
+            <div class="bridge-grid">
+              <article class="list-item">
+                <h4>Role</h4>
+                <p>Owns all local path work on Windows so Docker stays isolated from your real disks.</p>
+              </article>
+              <article class="list-item">
+                <h4>SMB Path Publishing</h4>
+                <p>Maps approved shares to Windows SMB only when policy allows it, instead of exposing entire drives blindly.</p>
+              </article>
+              <article class="list-item">
+                <h4>Install-Only Gate</h4>
+                <p>Future agent jobs execute installers from approved entry paths without turning every package into a normal downloadable share.</p>
+              </article>
+              <article class="list-item">
+                <h4>Telemetry</h4>
+                <p>Feeds the API with device heartbeats, scan results, publish state, and future copy/install timings.</p>
+              </article>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>

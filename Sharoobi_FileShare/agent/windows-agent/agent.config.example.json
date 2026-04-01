@@ -1,0 +1,7 @@
+{
+  "hostname": "CLIENT-LAPTOP-04",
+  "profile": "managed-office",
+  "api_base_url": "http://localhost:18080",
+  "bootstrap_token": "change_this_bootstrap_token",
+  "agent_version": "windows-agent-0.1.0"
+}
